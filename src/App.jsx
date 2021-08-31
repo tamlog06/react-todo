@@ -1,28 +1,27 @@
 import React, { useState }from "react";
-import Form from "./components/Form";
-import FilterButton from "./components/FilterButton";
 import Todo from "./components/Todo";
+import Finished from "./components/Finished";
 import { nanoid } from "nanoid";
 
-// App内に書くとAppが呼び出される度に定義し直してしまうからAppの外に
+// オブジェクトが空かどうか
+function isNotEmpty(obj) {
+  return !!Object.keys(obj).length;
+}
 
-const FILTER_MAP = {
-  All: () => true,
-  Active: task => !task.completed,
-  Completed: task => task.completed
-};
+export default function App() {
+  const [tasks, setTasks] = useState([]);
+  const [show, setShow] = useState(false);
+  const [name, setName] = useState('');
+  const [beforeName, setBeforeName] = useState('');
+  const [editId, setId] = useState(null);
 
-const FILTER_NAMES = Object.keys(FILTER_MAP); // return ['All', 'Active', 'Completed']
-
-function App(props) {
-  const [tasks, setTasks] = useState(props.tasks);
-  const [filter, setFilter] = useState('All');
-
+  // taskの追加
   function addTask(name){
     const newTask = { id: "todo-" + nanoid(), name: name, completed: false };
     setTasks([...tasks, newTask]);
   }
-  
+
+  // taskを完了する
   function toggleTaskCompleted(id) {
     const updatedTasks = tasks.map(task => {
       if (id === task.id) {
@@ -33,11 +32,27 @@ function App(props) {
     setTasks(updatedTasks);
   }
 
+  // taskを削除
   function deleteTask(id) {
+    // 編集中に、編集中のものを削除する際の処理
+    const deltask = tasks.filter(task => task.id === editId);
+    if (isNotEmpty(deltask) && deltask[0].name === beforeName) {
+      setBeforeName('');
+      setName('');
+      setId(null);
+    }
     const remainingTasks = tasks.filter(task => id !== task.id);
     setTasks(remainingTasks);
   }
 
+  // taskを編集する準備
+  function changeEdit(id, beforeName) {
+    setName(beforeName);
+    setBeforeName(beforeName);
+    setId(id);
+  }
+
+  // 実際にtaskを編集してtodoを書き換える
   function editTask(id, newName) {
     const editedTaskList = tasks.map(task => {
       if (id === task.id) {
@@ -46,50 +61,164 @@ function App(props) {
       return task;
     });
     setTasks(editedTaskList);
+    setId(null);
+    setBeforeName('');
   }
 
-  const taskList = tasks
-  .filter(FILTER_MAP[filter])
+  // inputの中身を変える
+  function handleChange(e) {
+    setName(e.target.value);
+  }
+
+  // inputを保存する場合のバリデーションと各操作
+  function handleSubmit(e){
+    e.preventDefault();
+    // 空欄
+    if (!name) {
+      alert("やることを入力してください");
+    } 
+    // 編集時に無編集
+    else if (beforeName === name) {
+      alert('編集項目が変更されていません');
+    } 
+    // 重複
+    else if (activeListNames.includes(name)) {
+      alert("同名の項目が存在します");
+    } 
+    // taskの追加
+    else if (editId === null) {
+      addTask(name);
+      setName("");
+    } 
+    // taskの編集
+    else {
+      editTask(editId, name);
+      setName("");
+    }
+  }
+
+  
+  // 未完了のtodoリスト
+  const activeList = tasks
+  .filter(task => !task.completed)
   .map(task => 
     <Todo 
       id={task.id} 
       name={task.name} 
-      completed={task.completed} 
       key={task.id} 
       toggleTaskCompleted={toggleTaskCompleted} 
       deleteTask={deleteTask}
-      editTask={editTask}
+      changeEdit={changeEdit}
     />
   );
-
-  const filterList = FILTER_NAMES.map(name => (
-    <FilterButton 
-    key={name} 
-    name={name} 
-    isPressed={name === filter}
-    setFilter={setFilter}
+  
+  // 未完了のtodoリストの名前のリスト
+  const activeListNames = tasks
+  .filter(task => !task.completed)
+  .map(task => task.name);
+  
+  // 完了済みのtaskリスト
+  const completedList = tasks
+  .filter(task => task.completed)
+  .map(task => 
+    <Finished 
+      id={task.id} 
+      name={task.name} 
+      key={task.id} 
     />
-  ));
+  );
   
-  const tasksNoun = taskList.length !== 1 ? 'tasks' : 'task';
-  const headingText = `${taskList.length} ${tasksNoun} remaining`;
+  // 完了済みのtaskの数
+  const completedNum = completedList.length;
   
-  return (
+  // 完了済みのtaskを表示するかどうかの変更
+  function changeShow() {
+    if (completedNum === 0) {
+      setShow(false);
+    } else {
+      setShow(!show);
+    }
+  }
+  
+  // 完了済みのtaskを表示するかどうかのボタンのメッセージ
+  const message = show ? "表示しているよ" : "表示ボタン";
+  
+  // taskを記入するフォームのview
+  const Form = (
+    <form onSubmit={handleSubmit}>
+    <h1 className="title-wrapper">
+      Todoリスト作成
+    </h1>
+    <input
+      type="text"
+      id="new-todo-input"
+      className="input input__lg"
+      name="text"
+      autoComplete="off"
+      value={name}
+      onChange={handleChange}
+    />
+    <button type="submit" className="btn btn__primary btn__lg">
+      保存
+    </button>
+  </form>
+  );
+  
+  // 完了済みtaskを表示するview
+  const ShowTemplate = (
     <div className="todoapp stack-large">
-      <Form addTask={addTask} />
-      <div className="filters btn-group stack-exception">
-        {filterList}
-      </div>
-      <h2 id="list-heading">{headingText}</h2>
+      {Form}
+      <h1>Todoリスト</h1>
       <ul
-        role="list"
         className="todo-list stack-large stack-exception"
         aria-labelledby="list-heading"
       >
-        {taskList}
+        {activeList}
+      </ul>
+      <button type="button" className="btn" onClick={() => changeShow() }>
+        {message}
+      </button>
+      <h1>完了リスト</h1>
+      <ul
+        className="todo-list stack-large stack-exception"
+        aria-labelledby="list-heading"
+      >
+        {completedList}
       </ul>
     </div>
   );
+  
+  // 完了済みtaskを非表示にするview
+  const HideTemplate = (
+    <div className="todoapp stack-large">
+      {Form}
+      <h1>Todoリスト</h1>
+      <ul
+        className="todo-list stack-large stack-exception"
+        aria-labelledby="list-heading"
+      >
+        {activeList}
+      </ul>
+      <button type="button" className="btn" onClick={() => changeShow() }>
+        {message}
+      </button>
+    </div>
+  );
+  
+  // 5個taskを消化した場合のview
+  const FinishTemplate = (
+    <div>
+      <h1>Bootcamp突破おめでとう!!</h1>
+    </div>
+  )
+  
+  // 場合に応じてviewを変える
+  function changeTemplate(){
+    if (completedNum >= 5) {
+      return FinishTemplate;
+    } else {
+      return (show ? ShowTemplate : HideTemplate);
+    }
+  }
+  return changeTemplate();
 }
-
-export default App;

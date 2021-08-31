@@ -109,7 +109,7 @@ body {
 .btn-group > * + * {
   margin-left: 0.8rem;
 }
-.label-wrapper {
+.title-wrapper {
   margin: 0;
   flex: 0 0 100%;
   text-align: center;
